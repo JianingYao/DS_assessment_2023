@@ -1,0 +1,95 @@
+---
+title: "DS assessment question 1"
+author: "Jianing Yao"
+date: "2023-08-26"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Web scraping
+
+```{r}
+library(rvest)
+
+# URL of the wikipedia page on natural disasters
+url <- "https://en.wikipedia.org/wiki/List_of_natural_disasters_by_death_toll"
+content <- read_html(url)
+tables <- html_table(content)
+century20 <- tables[[2]]
+head(century20)
+century21 <- tables[[3]]
+head(century21)
+century20 <- as.data.frame(century20)
+century21 <- as.data.frame(century21)
+```
+
+
+### Merge the 20th and 21st century data frames
+
+```{r}
+century20$Century <- rep('20th', nrow(century20))
+century21$Century <- rep('21st', nrow(century21))
+disasters <- rbind(century20, century21)
+disasters$Century <- as.factor(disasters$Century)
+levels(disasters$Century) <- c("20th Century", "21st Century")
+disasters$Type <- as.factor(disasters$Type)
+disasters$Event <- gsub("\\[\\d+\\]", "", disasters$Event)
+disasters$`Death toll` <- gsub("\\[\\d+\\]", "", disasters$`Death toll`)
+
+```
+
+
+### Convert the death toll to numbers
+
+```{r}
+disasters$`Death toll` <- gsub("[+,]", "", disasters$`Death toll`)
+library(dplyr)
+convert_range <- function(death_toll){
+  if(grepl("–", death_toll)){
+    mean(as.numeric(strsplit(death_toll, "–")[[1]]))
+  } else{
+    as.numeric(death_toll)
+  }
+}
+
+disasters$`Death toll` <- sapply(disasters$`Death toll`, convert_range)
+```
+
+
+### Plot the death toll
+```{r}
+library(ggplot2)
+distinct_colors <- c("#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd",
+                     "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf")
+plt <- ggplot(disasters, aes(x = Year, y = log10(`Death toll`), color = Type)) +
+     geom_point() +
+     geom_line() +
+     scale_x_continuous(breaks = seq(min(disasters$Year), max(disasters$Year), by = 5)) +
+     scale_color_manual(values = distinct_colors) +
+     labs(title = "Death Toll by Year and Kind of Disaster",
+          x = "Year",
+          y = "Death Toll (Log 10 Scale)",
+          color = "Kind of Disaster") +
+     theme_bw() + 
+     expand_limits(y = 2) +
+     theme(
+         aspect.ratio = 0.7,
+         axis.text.x = element_text(angle = 45, hjust = 1)
+    )
+ggsave("plot.png", plt, width = 10, height = 6, units = "in", dpi = 300)
+
+```
+
+
+
+```{r}
+plt
+```
+
+
+
